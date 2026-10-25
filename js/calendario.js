@@ -6,7 +6,10 @@ const sumarMes = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d 
 const nombreMes = (ym) => { const [y, m] = ym.split('-').map(Number); const t = new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }); return t[0].toUpperCase() + t.slice(1); };
 
 export const REPETIR = [['no', 'No se repite'], ['semanal', 'Cada semana'], ['mensual', 'Cada mes'], ['anual', 'Cada año']];
-export const AVISO = [['no', 'Sin aviso'], ['0', 'A la hora del evento'], ['60', '1 hora antes'], ['1440', '1 día antes'], ['10080', '1 semana antes']];
+// Valores: minutos antes del evento ("1440"), varios separados por comas ("10080,1440")
+// o una hora fija del mismo día ("h10:00").
+export const AVISO = [['no', 'Sin aviso'], ['0', 'A la hora del evento'], ['h09:00', 'El mismo día a las 9:00'], ['h10:00', 'El mismo día a las 10:00'],
+  ['60', '1 hora antes'], ['1440', '1 día antes'], ['10080', '1 semana antes'], ['10080,1440', '1 semana y 1 día antes']];
 
 // Fechas (YYYY-MM-DD) en que ocurre un evento entre "desde" y "hasta" (incluidas)
 export function ocurrencias(ev, desde, hasta) {

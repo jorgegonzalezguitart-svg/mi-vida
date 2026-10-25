@@ -34,6 +34,7 @@ export async function borrarAvisosLocales() { try { await guardarLocal([]); } ca
 // ---------- Cálculo de avisos ----------
 const a2 = (n) => String(n).padStart(2, '0');
 const fechaLocal = (iso, hora = '09:00') => { const [y, m, d] = iso.split('-').map(Number); const [h, mi] = hora.split(':').map(Number); return new Date(y, m - 1, d, h, mi); };
+const iso = (d) => `${d.getFullYear()}-${a2(d.getMonth() + 1)}-${a2(d.getDate())}`;
 const corta = (d) => `${a2(d.getDate())}/${a2(d.getMonth() + 1)}/${d.getFullYear()}`;
 
 export function calcularAvisos(estado) {
@@ -54,9 +55,15 @@ export function calcularAvisos(estado) {
   for (const ev of (estado.registros || []).filter((r) => r.tipo === 'evento' && r.aviso && r.aviso !== 'no')) {
     for (const f of ocurrencias(ev, hoy, fin)) {
       const momento = fechaLocal(f, ev.hora || '09:00');
-      const cuando = new Date(momento.getTime() - Number(ev.aviso) * 60000);
-      if (cuando.getTime() < ahora || cuando.getTime() > limite) continue;
-      lista.push({ cuando, titulo: `📌 ${ev.titulo}`, cuerpo: `${corta(momento)}${ev.hora ? ' a las ' + ev.hora : ''}`, url: `#calendario?m=${f.slice(0, 7)}&d=${f}` });
+      const cuandos = String(ev.aviso).startsWith('h')
+        ? [fechaLocal(f, String(ev.aviso).slice(1))]
+        : String(ev.aviso).split(',').map((m) => new Date(momento.getTime() - Number(m) * 60000));
+      for (const cuando of cuandos) {
+        if (isNaN(cuando) || cuando.getTime() < ahora || cuando.getTime() > limite) continue;
+        const dias = Math.round((fechaLocal(f, '00:00') - fechaLocal(iso(cuando), '00:00')) / 86400000);
+        const cuanto = dias <= 0 ? 'Hoy' : dias === 1 ? 'Mañana' : `En ${dias} días`;
+        lista.push({ cuando, titulo: `📌 ${ev.titulo}`, cuerpo: `${cuanto}: ${corta(momento)}${ev.hora ? ' a las ' + ev.hora : ''}`, url: `#calendario?m=${f.slice(0, 7)}&d=${f}` });
+      }
     }
   }
   lista.sort((a, b) => a.cuando - b.cuando);

@@ -366,7 +366,7 @@ function router() {
   const seccion = { doc: 'documentos', 'nuevo-doc': 'documentos', 'editar-doc': 'documentos',
     importar: 'mas', ajustes: 'mas', lista: 'mas', contrasenas: 'mas',
     clave: 'mas', 'nueva-clave': 'mas', 'editar-clave': 'mas',
-    'nuevo-mov': 'dinero', 'editar-mov': 'dinero', 'nuevo-evento': 'calendario', 'editar-evento': 'calendario',
+    dinero: 'mas', 'nuevo-mov': 'mas', 'editar-mov': 'mas', 'nuevo-evento': 'calendario', 'editar-evento': 'calendario',
     inversion: 'inversiones', 'nueva-inversion': 'inversiones', 'editar-inversion': 'inversiones' }[nombre] || nombre;
   $$('a', menu).forEach((a) => a.classList.toggle('activo', a.dataset.ruta === seccion));
 
@@ -414,6 +414,8 @@ function vistaInicio() {
 
   pintar(`<header class="cabecera"><h1>Hola 👋</h1><p class="sub">${esc(hoy)}</p></header>
 
+    ${estado.inversiones.length ? V.resumenInicio(ctxInv()) : ''}
+
     <section class="tarjeta">
       <h2>⏰ Caduca pronto</h2>
       ${proximos.length
@@ -425,20 +427,6 @@ function vistaInicio() {
       <a href="#documentos" class="dato"><b>${estado.docs.length}</b><span>Documentos</span></a>
       <a href="#contrasenas" class="dato"><b>${estado.claves.length}</b><span>Contraseñas</span></a>
     </section>
-
-    ${estado.inversiones.length ? (() => {
-      const t = totalesInversion();
-      return `<a href="#inversiones" class="tarjeta dato-ancho">
-        <span>📈 Inversiones</span><b>${euros(t.valor)}</b>
-        <small class="${claseGanancia(t.eur)}">${t.eur >= 0 ? '+' : ''}${euros(t.eur)} (${pct(t.pct)})</small></a>`;
-    })() : ''}
-
-    ${(() => {
-      const m = D.resumenMes(ctxApp());
-      return m ? `<a href="#dinero" class="tarjeta dato-ancho"><span>💶 Este mes</span>
-        <b class="${m.ahorro >= 0 ? 'sube' : 'baja'}">${m.ahorro >= 0 ? '+' : ''}${euros(m.ahorro)}</b>
-        <small>Ingresos ${euros(m.ingresos)} · gastos ${euros(m.gastos)}</small></a>` : '';
-    })()}
 
     ${(() => {
       const hoy = new Date().toISOString().slice(0, 10);
@@ -464,6 +452,17 @@ function vistaInicio() {
       <a class="btn" href="#nuevo-doc">＋ Documento</a>
       <a class="btn" href="#nueva-clave">＋ Contraseña</a>
     </div>`);
+  preciosAlDia(() => location.hash.replace('#', '') in { '': 1, inicio: 1 } && vistaInicio());
+}
+
+// Si los precios tienen más de 6 horas, los actualiza en segundo plano y repinta
+let buscandoPrecios = false;
+function preciosAlDia(repintar) {
+  let ultimaVez = 0;
+  try { ultimaVez = Number(localStorage.getItem('mv-precios') || 0); } catch { /* nada */ }
+  if (buscandoPrecios || !estado.inversiones.length || estado.sinTablaInv || Date.now() - ultimaVez < 6 * 3600000) return;
+  buscandoPrecios = true;
+  actualizarPrecios().then(repintar).catch((e) => console.warn('Precios sin actualizar:', e)).finally(() => { buscandoPrecios = false; });
 }
 
 // ============================================================
@@ -1216,6 +1215,8 @@ function vistaMas() {
     <ul class="lista">
       <li><a class="fila-item" href="#contrasenas"><span class="icono">🔑</span><span class="texto"><b>Contraseñas</b>
         <small>${estado.claves.length} guardadas, cifradas</small></span></a></li>
+      <li><a class="fila-item" href="#dinero"><span class="icono">💶</span><span class="texto"><b>Gastos e ingresos</b>
+        <small>Apuntes de dinero del día a día (ya no está en el menú)</small></span></a></li>
       <li><a class="fila-item" href="#lista"><span class="icono">✅</span><span class="texto"><b>Por subir</b>
         <small>${hechos} de ${activos.length} documentos guardados</small></span></a></li>
       <li><a class="fila-item" href="#ajustes"><span class="icono">⚙️</span><span class="texto"><b>Ajustes y seguridad</b>

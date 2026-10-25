@@ -30,6 +30,61 @@ function preparar(ctx) {
 }
 
 // ============================================================
+//  RESUMEN CORTO PARA INICIO (devuelve HTML)
+// ============================================================
+export function resumenInicio(ctx) {
+  const { estado, esc, euros, pct, fecha } = ctx;
+  const lista = estado.inversiones;
+  if (!lista.length) return '';
+  const d = preparar(ctx);
+  const valor = lista.reduce((s, p) => s + ctx.valorEur(p), 0);
+  const coste = lista.reduce((s, p) => s + d.costeDe(p), 0);
+  const gan = valor - coste;
+  const lotes = lista.flatMap((p) => d.lotesDe(p)).sort((a, b) => a.f.localeCompare(b.f));
+  const hoy = hoyISO();
+  const tirAnual = F.tir(lotes.map((l) => ({ f: l.f, importe: -l.coste })).concat({ f: hoy, importe: valor }));
+  const mes = hoy.slice(0, 7);
+  const aportMes = lotes.filter((l) => l.f.startsWith(mes)).reduce((s, l) => s + l.coste, 0);
+  const objetivo = Number(leerLS('mv-dca', 800)) || 800;
+
+  // Cambio respecto a hace ~30 días, con el histórico que guarda la app
+  const serie = ctx.serieTotal(lista);
+  const hace30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const antes = [...serie].reverse().find((x) => x.f <= hace30);
+  const cambio30 = antes ? valor - antes.v : null;
+
+  // Reparto por entidad y por tipo
+  const sumar = (clave) => {
+    const m = {};
+    for (const p of lista) { const k = clave(p); m[k] = (m[k] || 0) + ctx.valorEur(p); }
+    return Object.entries(m).map(([nombre, v]) => ({ nombre, v })).sort((a, b) => b.v - a.v);
+  };
+  const entidades = sumar((p) => p.entidad || 'Otras');
+  const tipos = sumar((p) => (p.tipo === 'cripto' ? 'Cripto' : p.tipo === 'fondo' ? 'Fondos indexados' : 'Otros'));
+  const fechaPrecios = lista.map((p) => p.precioFecha).filter(Boolean).sort().pop();
+  const filaReparto = (x) => `<li><span>${esc(x.nombre)}</span><small>${euros(x.v)} · ${porc(valor ? (x.v / valor) * 100 : 0)}</small>
+    <div class="barra"><span style="width:${valor ? Math.max(2, (x.v / valor) * 100) : 0}%"></span></div></li>`;
+  const kpi = (t, v, sub = '', clase = '') => `<div class="kpi"><span>${t}</span><b class="${clase}">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const signo = (n) => (n >= 0 ? '+' : '');
+
+  return `<section class="tarjeta resumen-inv inicio-inv">
+    <h2>📈 Tu dinero invertido</h2>
+    <p class="grande">${euros(valor)}</p>
+    <p class="${gan >= 0 ? 'sube' : 'baja'}"><b>${signo(gan)}${euros(gan)}</b> (${pct(coste ? (gan / coste) * 100 : 0)}) sobre ${euros(coste)} aportados</p>
+    <section class="kpis compactos">
+      ${kpi('Rentabilidad anual (TIR)', tirAnual == null ? '—' : pct(tirAnual * 100), '', tirAnual >= 0 ? 'sube' : 'baja')}
+      ${kpi('Últimos 30 días', cambio30 == null ? '—' : `${signo(cambio30)}${euros(cambio30)}`, cambio30 == null ? 'aún sin histórico' : '', cambio30 >= 0 ? 'sube' : 'baja')}
+      ${kpi('Aportado este mes', euros(aportMes), `objetivo ${euros(objetivo)}`, aportMes >= objetivo * 0.95 ? 'sube' : '')}
+      ${kpi('Posiciones', String(lista.length), fechaPrecios ? `precios del ${fecha(fechaPrecios)}` : '')}
+    </section>
+    ${serie.length >= 2 ? G.lineasTiempo([{ nombre: 'Valor', clase: 'l-val', puntos: serie.map((x) => ({ f: x.f, v: x.v })), puntoFinal: true }], { alto: 220, desdeCero: false, formato: (v) => `${(v / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 })} k€` }) : ''}
+    <h3>Por entidad</h3><ul class="mini reparto">${entidades.map(filaReparto).join('')}</ul>
+    <h3>Por tipo</h3><ul class="mini reparto">${tipos.map(filaReparto).join('')}</ul>
+    <a class="btn primario" href="#inversiones">Ver todo el detalle</a>
+  </section>`;
+}
+
+// ============================================================
 //  RESUMEN
 // ============================================================
 export function resumen(ctx, caja) {

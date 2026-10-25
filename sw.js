@@ -1,6 +1,6 @@
 ﻿// Permite instalar la app, abrirla aunque falle la red un momento y recibir avisos.
 // Solo guarda los archivos de la app, NUNCA tus datos (que van cifrados en Supabase).
-const CACHE = 'mi-vida-v10';
+const CACHE = 'mi-vida-v11';
 const ARCHIVOS = [
   './', 'index.html', 'css/estilos.css',
   'js/app.js', 'js/cripto.js', 'js/datos.js', 'js/config.js',
