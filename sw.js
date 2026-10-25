@@ -1,6 +1,6 @@
 ﻿// Permite instalar la app, abrirla aunque falle la red un momento y recibir avisos.
 // Solo guarda los archivos de la app, NUNCA tus datos (que van cifrados en Supabase).
-const CACHE = 'mi-vida-v11';
+const CACHE = 'mi-vida-v12';
 const ARCHIVOS = [
   './', 'index.html', 'css/estilos.css',
   'js/app.js', 'js/cripto.js', 'js/datos.js', 'js/config.js',
@@ -10,7 +10,7 @@ const ARCHIVOS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -24,7 +24,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' }) // pregunta siempre al servidor si hay versión nueva
       .then((r) => { const copia = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copia)); return r; })
       .catch(() => caches.match(e.request, { ignoreSearch: true })));
 });

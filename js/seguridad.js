@@ -179,14 +179,38 @@ async function secretoPrf(C, idCredencial, salPrf) {
   return new Uint8Array(r);
 }
 
-export async function activarHuella(ctx, claveMaestra) {
+// Paso 1: comprueba la clave maestra (tal cual y sin espacios al principio/final) y devuelve la llave exportable
+export async function comprobarClaveHuella(ctx, claveMaestra) {
   const { estado, C } = ctx;
   const b = estado.boveda;
-  let llave;
-  try {
-    llave = await C.derivarClave(claveMaestra, b.sal, b.iteraciones, true);
-    await C.descifrarJSON(llave, b.comprobacion);
-  } catch { throw new Error('La clave maestra no es correcta.'); }
+  for (const v of [...new Set([claveMaestra, claveMaestra.trim()])]) {
+    try {
+      const llave = await C.derivarClave(v, b.sal, b.iteraciones, true);
+      await C.descifrarJSON(llave, b.comprobacion);
+      return llave;
+    } catch { /* probar la siguiente */ }
+  }
+  throw new Error('La clave maestra no es correcta. Pulsa 👁️ para ver lo que has escrito (mayúsculas, espacios, '
+    + 'y que el móvil no haya rellenado solo otra contraseña).');
+}
+
+// Traduce los errores del sensor a algo entendible (con el código técnico al final, para poder diagnosticar)
+export function explicarErrorHuella(x) {
+  const n = x?.name && x.name !== 'Error' ? x.name : '';
+  const textos = {
+    NotAllowedError: 'Se canceló o el móvil no dejó usar la huella. Si no lo cancelaste tú, comprueba que tienes una huella '
+      + 'y bloqueo de pantalla configurados en Android y que Chrome está actualizado.',
+    InvalidStateError: 'Ya había una huella creada para Mi Vida en este móvil. Vuelve a intentarlo.',
+    NotSupportedError: 'Este móvil o navegador no admite este tipo de huella. Prueba desde Chrome actualizado.',
+    SecurityError: 'El navegador bloqueó la huella por seguridad (abre la app desde su dirección normal, con https).',
+    AbortError: 'Se interrumpió. Vuelve a intentarlo.',
+  };
+  return `${textos[n] || x?.message || String(x)}${n ? ` (código: ${n})` : ''}`;
+}
+
+// Paso 2: crea la "llave de huella" (debe llamarse justo al pulsar un botón)
+export async function activarHuella(ctx, llave) {
+  const { estado, C } = ctx;
   const crudo = new Uint8Array(await crypto.subtle.exportKey('raw', llave));
   const salPrf = crypto.getRandomValues(new Uint8Array(32));
   const cred = await navigator.credentials.create({

@@ -208,7 +208,7 @@ function vistaDesbloquear() {
   const botonHuella = $('#huella');
   if (botonHuella) {
     const usarHuella = () => ocupado(botonHuella, 'Esperando a la huella…', async () => {
-      try { await abrirBoveda(await S.desbloquearConHuella(ctxApp())); } catch (e) { $('#err').textContent = e.message || 'No se pudo usar la huella.'; }
+      try { await abrirBoveda(await S.desbloquearConHuella(ctxApp())); } catch (e) { $('#err').textContent = e.name ? S.explicarErrorHuella(e) : (e.message || 'No se pudo usar la huella.'); }
     });
     botonHuella.onclick = usarHuella;
   }
@@ -1251,8 +1251,14 @@ function vistaAjustes() {
       ${huella
         ? `<p>✅ Activado en este dispositivo.</p><button class="btn texto" id="huella-off">Desactivar en este dispositivo</button>`
         : `<p class="ayuda">Abre Mi Vida con la huella (o la cara) en vez de escribir la clave maestra. Se activa en cada dispositivo por separado.</p>
-           <form id="f-huella" class="en-linea-form"><input type="password" name="c" placeholder="Tu clave maestra" autocomplete="current-password" required>
-           <button class="btn primario" type="submit">Activar</button></form>`}
+           <form id="f-huella" autocomplete="off">
+             <label>1. Escribe tu clave maestra
+               <span class="con-boton"><input type="text" name="clave-huella" id="clave-h" class="oculto-texto" required
+                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
+               <button type="button" class="btn peq" id="ver-clave-h" aria-label="Mostrar u ocultar">👁️</button></span></label>
+             <button class="btn primario" type="submit">Comprobar clave</button></form>
+           <button class="btn primario ancho" id="poner-dedo" hidden>👆 2. Pon el dedo</button>
+           <p class="ayuda" id="paso-huella"></p>`}
       <p class="error" id="err-huella"></p>
     </section>
     <div id="caja-avisos"></div>
@@ -1308,16 +1314,34 @@ function vistaAjustes() {
     });
   };
   $('#huella-off')?.addEventListener('click', () => { S.olvidarHuella(); aviso('Huella desactivada en este dispositivo'); vistaAjustes(); });
+  // Huella en dos pasos: comprobar la clave (tarda) y, con un toque nuevo, pedir el dedo
+  // (Android exige que el sensor se pida justo tras pulsar un botón).
+  let llaveHuella = null;
+  $('#ver-clave-h')?.addEventListener('click', () => $('#clave-h').classList.toggle('oculto-texto'));
   $('#f-huella')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const clave = new FormData(e.target).get('c');
-    ocupado($('#f-huella button'), 'Pon el dedo…', async () => {
+    const clave = $('#clave-h').value;
+    $('#err-huella').textContent = '';
+    $('#paso-huella').textContent = 'Comprobando la clave… en el móvil puede tardar unos segundos.';
+    ocupado($('#f-huella button[type=submit]'), 'Comprobando…', async () => {
       try {
-        if (!(await S.puedeUsarHuella())) throw new Error('Este dispositivo no tiene huella o reconocimiento facial disponible.');
-        await S.activarHuella(ctxApp(), clave);
+        if (!(await S.puedeUsarHuella())) throw new Error('Este móvil no tiene huella ni bloqueo de pantalla disponible para apps web. Configura una huella en Android y usa Chrome.');
+        llaveHuella = await S.comprobarClaveHuella(ctxApp(), clave);
+        $('#f-huella').hidden = true;
+        $('#poner-dedo').hidden = false;
+        $('#paso-huella').textContent = '✅ Clave correcta. Pulsa «Pon el dedo». Puede que te lo pida dos veces.';
+      } catch (x) { $('#paso-huella').textContent = ''; $('#err-huella').textContent = x.message || String(x); }
+    });
+  });
+  $('#poner-dedo')?.addEventListener('click', (e) => {
+    $('#err-huella').textContent = '';
+    ocupado(e.target, 'Esperando a la huella…', async () => {
+      try {
+        await S.activarHuella(ctxApp(), llaveHuella);
+        llaveHuella = null;
         aviso('Huella activada 👆');
         vistaAjustes();
-      } catch (x) { $('#err-huella').textContent = x.name === 'NotAllowedError' ? 'Cancelado.' : (x.message || String(x)); }
+      } catch (x) { $('#err-huella').textContent = S.explicarErrorHuella(x); }
     });
   });
 
