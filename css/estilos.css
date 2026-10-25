@@ -415,3 +415,15 @@ summary { cursor: pointer; font-size: .9rem; }
 .patrimonio .mini { margin: 6px 0 0; }
 .patrimonio .mini b { font-size: .95rem; color: var(--texto); }
 .patrimonio .mini b.baja { color: var(--rojo-t); }
+
+/* Datos importantes */
+.buscador-datos { position: sticky; top: 0; z-index: 5; background: var(--fondo); padding: 4px 0 10px; }
+.buscador-datos input { width: 100%; font-size: 1.05rem; padding: 12px 14px; }
+.dato-fila { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--borde); }
+.dato-fila:last-child { border-bottom: none; }
+.dato-fila .texto { flex: 1; min-width: 0; display: flex; flex-direction: column; text-decoration: none; color: var(--texto); }
+.dato-fila .texto small { color: var(--suave); }
+.dato-fila .texto b { font-size: 1.02rem; overflow-wrap: anywhere; }
+.dato-fila .texto .nota { font-size: .75rem; }
+.dato-fila .copiar { margin: 0; flex: none; }
+.dato-fila[hidden], .grupo-datos[hidden] { display: none; }

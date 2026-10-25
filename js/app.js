@@ -9,6 +9,7 @@ import * as K from './calendario.js';
 import * as A from './avisos.js';
 import * as H from './hipoteca.js';
 import * as CO from './contactos.js';
+import * as DI from './datos-importantes.js';
 
 // ============================================================
 //  Estado y utilidades
@@ -307,7 +308,7 @@ async function borrarRegistro(id) {
 function ctxApp() {
   return {
     estado, sb, C, TABLAS, BUCKET, esc, fecha, num, euros, pintar, $, $$, ir, aviso, ocupado,
-    guardarRegistro, borrarRegistro,
+    guardarRegistro, borrarRegistro, copiar,
     pintarAvisos: (caja) => A.pintarAvisos(ctxApp(), caja),
   };
 }
@@ -369,7 +370,7 @@ function router() {
     importar: 'mas', ajustes: 'mas', lista: 'mas', contrasenas: 'mas',
     clave: 'mas', 'nueva-clave': 'mas', 'editar-clave': 'mas',
     dinero: 'mas', 'nuevo-mov': 'mas', 'editar-mov': 'mas', 'nuevo-evento': 'calendario', 'editar-evento': 'calendario',
-    contactos: 'mas', 'nuevo-contacto': 'mas', 'editar-contacto': 'mas', 'editar-hipoteca': 'inversiones',
+    datos: 'mas', 'nuevo-dato': 'mas', 'editar-dato': 'mas', contactos: 'mas', 'nuevo-contacto': 'mas', 'editar-contacto': 'mas', 'editar-hipoteca': 'inversiones',
     inversion: 'inversiones', 'nueva-inversion': 'inversiones', 'editar-inversion': 'inversiones' }[nombre] || nombre;
   $$('a', menu).forEach((a) => a.classList.toggle('activo', a.dataset.ruta === seccion));
 
@@ -400,6 +401,9 @@ function router() {
     case 'nuevo-contacto': return CO.vistaFormContacto(ctxApp(), null);
     case 'editar-contacto': return CO.vistaFormContacto(ctxApp(), param);
     case 'editar-hipoteca': return H.vistaFormHipoteca(ctxApp());
+    case 'datos': return DI.vistaDatos(ctxApp(), q);
+    case 'nuevo-dato': return DI.vistaFormDato(ctxApp(), null);
+    case 'editar-dato': return DI.vistaFormDato(ctxApp(), param);
     default: return vistaInicio();
   }
 }
@@ -457,6 +461,7 @@ function vistaInicio() {
     </section>
 
     <div class="acciones">
+      <a class="btn" href="#datos">🔎 Datos importantes</a>
       <a class="btn" href="#nuevo-doc">＋ Documento</a>
       <a class="btn" href="#nueva-clave">＋ Contraseña</a>
     </div>`);
@@ -1223,6 +1228,8 @@ function vistaMas() {
     <ul class="lista">
       <li><a class="fila-item" href="#contrasenas"><span class="icono">🔑</span><span class="texto"><b>Contraseñas</b>
         <small>${estado.claves.length} guardadas, cifradas</small></span></a></li>
+      <li><a class="fila-item" href="#datos"><span class="icono">🔎</span><span class="texto"><b>Datos importantes</b>
+        <small>Buscador: dirección, CUPS, catastro, DNI, pólizas, teléfonos…</small></span></a></li>
       <li><a class="fila-item" href="#contactos"><span class="icono">📇</span><span class="texto"><b>Contactos importantes</b>
         <small>${(estado.registros || []).filter((r) => r.tipo === 'contacto').length} guardados: seguros, banco, luz, comunidad…</small></span></a></li>
       <li><a class="fila-item" href="#dinero"><span class="icono">💶</span><span class="texto"><b>Gastos e ingresos</b>
