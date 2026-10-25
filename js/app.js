@@ -7,6 +7,8 @@ import * as S from './seguridad.js';
 import * as D from './dinero.js';
 import * as K from './calendario.js';
 import * as A from './avisos.js';
+import * as H from './hipoteca.js';
+import * as CO from './contactos.js';
 
 // ============================================================
 //  Estado y utilidades
@@ -367,6 +369,7 @@ function router() {
     importar: 'mas', ajustes: 'mas', lista: 'mas', contrasenas: 'mas',
     clave: 'mas', 'nueva-clave': 'mas', 'editar-clave': 'mas',
     dinero: 'mas', 'nuevo-mov': 'mas', 'editar-mov': 'mas', 'nuevo-evento': 'calendario', 'editar-evento': 'calendario',
+    contactos: 'mas', 'nuevo-contacto': 'mas', 'editar-contacto': 'mas', 'editar-hipoteca': 'inversiones',
     inversion: 'inversiones', 'nueva-inversion': 'inversiones', 'editar-inversion': 'inversiones' }[nombre] || nombre;
   $$('a', menu).forEach((a) => a.classList.toggle('activo', a.dataset.ruta === seccion));
 
@@ -393,6 +396,10 @@ function router() {
     case 'calendario': return K.vistaCalendario(ctxApp(), q);
     case 'nuevo-evento': return K.vistaFormEvento(ctxApp(), null, q);
     case 'editar-evento': return K.vistaFormEvento(ctxApp(), param, q);
+    case 'contactos': return CO.vistaContactos(ctxApp(), q);
+    case 'nuevo-contacto': return CO.vistaFormContacto(ctxApp(), null);
+    case 'editar-contacto': return CO.vistaFormContacto(ctxApp(), param);
+    case 'editar-hipoteca': return H.vistaFormHipoteca(ctxApp());
     default: return vistaInicio();
   }
 }
@@ -414,6 +421,7 @@ function vistaInicio() {
 
   pintar(`<header class="cabecera"><h1>Hola 👋</h1><p class="sub">${esc(hoy)}</p></header>
 
+    ${H.tarjetaPatrimonio(ctxInv())}
     ${estado.inversiones.length ? V.resumenInicio(ctxInv()) : ''}
 
     <section class="tarjeta">
@@ -968,7 +976,7 @@ const ctxInv = () => ({
   estado, sb, esc, euros, pct, fecha, num, r2, valorEur, serieTotal, aviso, ocupado, $, $$,
 });
 
-const PESTANAS_INV = [['resumen', '📊 Resumen'], ['posiciones', '💼 Posiciones'], ['fiscal', '🧾 Fiscal'], ['noticias', '📰 Noticias']];
+const PESTANAS_INV = [['resumen', '📊 Resumen'], ['posiciones', '💼 Posiciones'], ['hipoteca', '🏠 Hipoteca'], ['fiscal', '🧾 Fiscal'], ['noticias', '📰 Noticias']];
 
 function vistaInversiones(q) {
   const pestana = PESTANAS_INV.some(([id]) => id === q?.get('t')) ? q.get('t') : 'resumen';
@@ -985,7 +993,7 @@ function vistaInversiones(q) {
     <p class="ayuda" id="estado-precios"></p>
     <div id="inv-cont"></div>`);
   const cont = $('#inv-cont');
-  const vista = { resumen: V.resumen, fiscal: V.fiscal, noticias: V.noticias }[pestana];
+  const vista = { resumen: V.resumen, fiscal: V.fiscal, noticias: V.noticias, hipoteca: H.vistaHipoteca }[pestana];
   if (vista) {
     Promise.resolve(vista(ctxInv(), cont)).catch((e) => {
       console.error(e);
@@ -1215,6 +1223,8 @@ function vistaMas() {
     <ul class="lista">
       <li><a class="fila-item" href="#contrasenas"><span class="icono">🔑</span><span class="texto"><b>Contraseñas</b>
         <small>${estado.claves.length} guardadas, cifradas</small></span></a></li>
+      <li><a class="fila-item" href="#contactos"><span class="icono">📇</span><span class="texto"><b>Contactos importantes</b>
+        <small>${(estado.registros || []).filter((r) => r.tipo === 'contacto').length} guardados: seguros, banco, luz, comunidad…</small></span></a></li>
       <li><a class="fila-item" href="#dinero"><span class="icono">💶</span><span class="texto"><b>Gastos e ingresos</b>
         <small>Apuntes de dinero del día a día (ya no está en el menú)</small></span></a></li>
       <li><a class="fila-item" href="#lista"><span class="icono">✅</span><span class="texto"><b>Por subir</b>

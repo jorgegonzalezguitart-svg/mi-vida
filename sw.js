@@ -1,11 +1,11 @@
 ﻿// Permite instalar la app, abrirla aunque falle la red un momento y recibir avisos.
 // Solo guarda los archivos de la app, NUNCA tus datos (que van cifrados en Supabase).
-const CACHE = 'mi-vida-v12';
+const CACHE = 'mi-vida-v13';
 const ARCHIVOS = [
   './', 'index.html', 'css/estilos.css',
   'js/app.js', 'js/cripto.js', 'js/datos.js', 'js/config.js',
   'js/fiscal.js', 'js/graficos.js', 'js/inversiones-vistas.js',
-  'js/seguridad.js', 'js/dinero.js', 'js/calendario.js', 'js/avisos.js', 'js/vapid.js',
+  'js/seguridad.js', 'js/dinero.js', 'js/calendario.js', 'js/avisos.js', 'js/vapid.js', 'js/hipoteca.js', 'js/contactos.js',
   'manifest.webmanifest', 'iconos/icono.svg', 'iconos/icon-192.png', 'iconos/icon-512.png',
 ];
 
