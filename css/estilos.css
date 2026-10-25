@@ -365,3 +365,37 @@ summary { cursor: pointer; font-size: .9rem; }
   #hoja .hueco { border: 2px solid #000; height: 90px; border-radius: 8px; margin-bottom: 16px; }
   #hoja .pie { margin-top: 32px; font-size: 11pt; }
 }
+
+/* Selector de mes (Dinero y Calendario) */
+.selector-mes { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+.selector-mes b { font-size: 1.1rem; }
+.selector-mes .btn { font-size: 1.5rem; min-width: 48px; }
+
+/* Gasto / Ingreso */
+.segmentos { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--borde); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.segmentos label { margin: 0; }
+.segmentos input { position: absolute; opacity: 0; pointer-events: none; }
+.segmentos span { display: block; text-align: center; padding: 12px; font-weight: 700; cursor: pointer; color: var(--suave); }
+.segmentos input:checked + span { background: var(--primario); color: var(--primario-texto); }
+.grande-input { font-size: 1.6rem; font-weight: 800; }
+
+/* Calendario */
+.calendario { padding: 10px; }
+.cal-cabecera, .cal-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; }
+.cal-cabecera span { font-size: .75rem; color: var(--suave); font-weight: 700; padding: 4px 0; }
+.cal-dias a {
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 10px; text-decoration: none; color: var(--texto); font-weight: 600; font-size: .9rem;
+}
+.cal-dias a.hoy { border: 2px solid var(--primario); }
+.cal-dias a.sel { background: var(--primario); color: var(--primario-texto); }
+.cal-dias i { display: flex; gap: 2px; height: 6px; }
+.cal-dias i b { width: 6px; height: 6px; border-radius: 50%; background: var(--primario); }
+.cal-dias i b.caducidad { background: var(--rojo-t); }
+.cal-dias a.sel i b { background: var(--primario-texto); }
+
+/* Ajustes */
+.btn.huella { width: 100%; margin-top: 4px; font-size: 1.05rem; }
+.en-linea-form { display: flex; gap: 8px; align-items: center; }
+.en-linea-form input { margin: 0; flex: 1; }
+.tarjeta-plana { padding: 8px 0 0; }

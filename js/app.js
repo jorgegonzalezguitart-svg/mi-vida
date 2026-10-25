@@ -3,6 +3,10 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import * as C from './cripto.js';
 import { CATEGORIAS, LISTA } from './datos.js';
 import * as V from './inversiones-vistas.js';
+import * as S from './seguridad.js';
+import * as D from './dinero.js';
+import * as K from './calendario.js';
+import * as A from './avisos.js';
 
 // ============================================================
 //  Estado y utilidades
@@ -19,9 +23,11 @@ const T_BOVEDA = 'mivida_boveda';
 const T_DOCS = 'mivida_documentos';
 const T_CLAVES = 'mivida_contrasenas';
 const T_INV = 'mivida_inversiones';
+const T_REG = 'mivida_registros';
+const TABLAS = { boveda: T_BOVEDA, docs: T_DOCS, claves: T_CLAVES, inversiones: T_INV, registros: T_REG };
 const BLOQUEO_MINUTOS = 5;
 
-const estado = { usuario: null, boveda: null, llave: null, docs: [], claves: [], inversiones: [], sinTablaInv: false };
+const estado = { usuario: null, boveda: null, llave: null, docs: [], claves: [], inversiones: [], registros: [], sinTablaInv: false, sinTablaReg: false };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -180,9 +186,17 @@ function vistaDesbloquear() {
       <button class="btn primario" type="submit">Desbloquear</button>
       <p class="error" id="err"></p>
     </form>
+    ${S.huellaActiva(estado.usuario?.id) ? '<button class="btn huella" id="huella">👆 Desbloquear con huella</button>' : ''}
     <button class="btn texto" id="salir">Cerrar sesión</button>
   </section>`);
   $('#salir').onclick = cerrarSesion;
+  const botonHuella = $('#huella');
+  if (botonHuella) {
+    const usarHuella = () => ocupado(botonHuella, 'Esperando a la huella…', async () => {
+      try { await abrirBoveda(await S.desbloquearConHuella(ctxApp())); } catch (e) { $('#err').textContent = e.message || 'No se pudo usar la huella.'; }
+    });
+    botonHuella.onclick = usarHuella;
+  }
   $('#f').onsubmit = (e) => {
     e.preventDefault();
     const clave = new FormData(e.target).get('c');
@@ -210,6 +224,7 @@ async function abrirBoveda(llave) {
     return vistaError(error);
   }
   vigilarInactividad();
+  A.sincronizar(ctxApp()); // mantiene al día las horas de aviso (solo si este móvil tiene avisos activados)
   ir(location.hash && location.hash !== '#' ? location.hash : '#inicio');
 }
 
@@ -230,6 +245,42 @@ async function cargarTodo() {
   if (inv.error) console.warn('Sin tabla de inversiones:', inv.error.message);
   estado.inversiones = inv.error ? [] : await Promise.all(inv.data.map(async (r) =>
     ({ ...(await C.descifrarJSON(estado.llave, r.datos)), id: r.id })));
+  // Registros (dinero, calendario…): igual, la app funciona aunque falte la tabla
+  const reg = await sb.from(T_REG).select('id, datos');
+  estado.sinTablaReg = !!reg.error;
+  estado.registros = reg.error ? [] : await Promise.all(reg.data.map(async (r) =>
+    ({ ...(await C.descifrarJSON(estado.llave, r.datos)), id: r.id })));
+}
+
+// Guarda un registro genérico cifrado (movimiento, evento…) y recalcula los avisos
+async function guardarRegistro(obj) {
+  if (estado.sinTablaReg) throw new Error('Falta crear la tabla mivida_registros en Supabase (supabase/extras.sql).');
+  const { id, ...datos } = obj;
+  const regId = id || crypto.randomUUID();
+  const { error } = await sb.from(T_REG).upsert({
+    id: regId, datos: await C.cifrarJSON(estado.llave, datos), actualizado: new Date().toISOString(),
+  });
+  if (error) throw error;
+  const r = { ...datos, id: regId };
+  estado.registros = estado.registros.filter((x) => x.id !== regId).concat(r);
+  A.sincronizar(ctxApp());
+  return r;
+}
+
+async function borrarRegistro(id) {
+  const { error } = await sb.from(T_REG).delete().eq('id', id);
+  if (error) throw error;
+  estado.registros = estado.registros.filter((x) => x.id !== id);
+  A.sincronizar(ctxApp());
+}
+
+// Utilidades que se pasan a los módulos de pantallas (dinero, calendario, avisos, seguridad)
+function ctxApp() {
+  return {
+    estado, sb, C, TABLAS, BUCKET, esc, fecha, num, euros, pintar, $, $$, ir, aviso, ocupado,
+    guardarRegistro, borrarRegistro,
+    pintarAvisos: (caja) => A.pintarAvisos(ctxApp(), caja),
+  };
 }
 
 function bloquear() {
@@ -238,6 +289,7 @@ function bloquear() {
   estado.docs = [];
   estado.claves = [];
   estado.inversiones = [];
+  estado.registros = [];
   $('#visor').hidden = true;
   arrancar();
 }
@@ -247,6 +299,7 @@ async function cerrarSesion() {
   estado.docs = [];
   estado.claves = [];
   estado.inversiones = [];
+  estado.registros = [];
   await sb.auth.signOut();
   estado.usuario = null;
   estado.boveda = null;
@@ -283,8 +336,10 @@ function router() {
   const q = new URLSearchParams(consulta);
   const menu = $('#menu');
   menu.hidden = false;
-  const seccion = { doc: 'documentos', 'nuevo-doc': 'documentos', 'editar-doc': 'documentos', importar: 'ajustes',
-    clave: 'contrasenas', 'nueva-clave': 'contrasenas', 'editar-clave': 'contrasenas',
+  const seccion = { doc: 'documentos', 'nuevo-doc': 'documentos', 'editar-doc': 'documentos',
+    importar: 'mas', ajustes: 'mas', lista: 'mas', contrasenas: 'mas',
+    clave: 'mas', 'nueva-clave': 'mas', 'editar-clave': 'mas',
+    'nuevo-mov': 'dinero', 'editar-mov': 'dinero', 'nuevo-evento': 'calendario', 'editar-evento': 'calendario',
     inversion: 'inversiones', 'nueva-inversion': 'inversiones', 'editar-inversion': 'inversiones' }[nombre] || nombre;
   $$('a', menu).forEach((a) => a.classList.toggle('activo', a.dataset.ruta === seccion));
 
@@ -304,6 +359,13 @@ function router() {
     case 'lista': return vistaLista();
     case 'ajustes': return vistaAjustes();
     case 'importar': return vistaImportar();
+    case 'mas': return vistaMas();
+    case 'dinero': return D.vistaDinero(ctxApp(), q);
+    case 'nuevo-mov': return D.vistaFormMov(ctxApp(), null);
+    case 'editar-mov': return D.vistaFormMov(ctxApp(), param);
+    case 'calendario': return K.vistaCalendario(ctxApp(), q);
+    case 'nuevo-evento': return K.vistaFormEvento(ctxApp(), null, q);
+    case 'editar-evento': return K.vistaFormEvento(ctxApp(), param, q);
     default: return vistaInicio();
   }
 }
@@ -343,6 +405,22 @@ function vistaInicio() {
         <span>📈 Inversiones</span><b>${euros(t.valor)}</b>
         <small class="${claseGanancia(t.eur)}">${t.eur >= 0 ? '+' : ''}${euros(t.eur)} (${pct(t.pct)})</small></a>`;
     })() : ''}
+
+    ${(() => {
+      const m = D.resumenMes(ctxApp());
+      return m ? `<a href="#dinero" class="tarjeta dato-ancho"><span>💶 Este mes</span>
+        <b class="${m.ahorro >= 0 ? 'sube' : 'baja'}">${m.ahorro >= 0 ? '+' : ''}${euros(m.ahorro)}</b>
+        <small>Ingresos ${euros(m.ingresos)} · gastos ${euros(m.gastos)}</small></a>` : '';
+    })()}
+
+    ${(() => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const en7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+      const evs = K.elementos(estado, hoy, en7).filter((e) => e.clase === 'evento');
+      return evs.length ? `<section class="tarjeta"><h2>📅 Esta semana</h2><ul class="lista">${evs.slice(0, 5).map((e) =>
+        `<li><a class="fila-item" href="#editar-evento/${e.id}"><span class="icono">📌</span>
+          <span class="texto"><b>${esc(e.titulo)}</b><small>${fecha(e.f)}${e.hora ? ' · ' + esc(e.hora) : ''}</small></span></a></li>`).join('')}</ul></section>` : '';
+    })()}
 
     <section class="tarjeta">
       <h2>✅ Por subir</h2>
@@ -1103,8 +1181,26 @@ function alternarNoAplica(e) {
 let eventoInstalar = null;
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); eventoInstalar = e; });
 
+function vistaMas() {
+  const descartados = noAplica();
+  const activos = LISTA.filter((i) => !descartados.includes(i.clave));
+  const hechos = activos.filter((i) => subido(i.clave)).length;
+  pintar(`<header class="cabecera"><h1>Más</h1></header>
+    <ul class="lista">
+      <li><a class="fila-item" href="#contrasenas"><span class="icono">🔑</span><span class="texto"><b>Contraseñas</b>
+        <small>${estado.claves.length} guardadas, cifradas</small></span></a></li>
+      <li><a class="fila-item" href="#lista"><span class="icono">✅</span><span class="texto"><b>Por subir</b>
+        <small>${hechos} de ${activos.length} documentos guardados</small></span></a></li>
+      <li><a class="fila-item" href="#ajustes"><span class="icono">⚙️</span><span class="texto"><b>Ajustes y seguridad</b>
+        <small>Huella, clave maestra, copia de seguridad, avisos</small></span></a></li>
+      <li><a class="fila-item" href="#importar"><span class="icono">📥</span><span class="texto"><b>Importar carpeta</b>
+        <small>Subir de golpe documentos clasificados</small></span></a></li>
+    </ul>`);
+}
+
 function vistaAjustes() {
-  pintar(`<header class="cabecera"><h1>Ajustes</h1></header>
+  const huella = S.huellaActiva(estado.usuario?.id);
+  pintar(`<header class="cabecera"><a href="#mas" class="volver">‹ Más</a><h1>Ajustes</h1></header>
     <section class="tarjeta">
       <h2>👤 Cuenta</h2>
       <p>${esc(estado.usuario?.email)}</p>
@@ -1115,9 +1211,37 @@ function vistaAjustes() {
       </div>
     </section>
     <section class="tarjeta">
+      <h2>👆 Desbloqueo con huella</h2>
+      ${huella
+        ? `<p>✅ Activado en este dispositivo.</p><button class="btn texto" id="huella-off">Desactivar en este dispositivo</button>`
+        : `<p class="ayuda">Abre Mi Vida con la huella (o la cara) en vez de escribir la clave maestra. Se activa en cada dispositivo por separado.</p>
+           <form id="f-huella" class="en-linea-form"><input type="password" name="c" placeholder="Tu clave maestra" autocomplete="current-password" required>
+           <button class="btn primario" type="submit">Activar</button></form>`}
+      <p class="error" id="err-huella"></p>
+    </section>
+    <div id="caja-avisos"></div>
+    <section class="tarjeta">
+      <h2>💾 Copia de seguridad</h2>
+      <p class="ayuda">Descarga un archivo con TODO (documentos, contraseñas, inversiones, dinero y calendario).
+      Sigue cifrado con tu clave maestra: guárdalo en un USB o en otra nube sin miedo.</p>
+      <div class="acciones"><button class="btn" id="copia">⬇️ Descargar copia</button>
+        <label class="btn subir">♻️ Restaurar copia<input type="file" accept=".json,application/json" id="restaurar" hidden></label></div>
+      <p class="ayuda" id="copia-estado"></p>
+    </section>
+    <section class="tarjeta">
       <h2>🔐 Clave maestra</h2>
       <p class="ayuda">Si la olvidas no se puede recuperar nada. Imprime la hoja, escríbela a mano y guárdala en casa.</p>
       <button class="btn" id="hoja">🖨️ Imprimir hoja de recuperación</button>
+      <details><summary>Cambiar la clave maestra</summary>
+        <form id="f-cambio" class="tarjeta-plana">
+          <p class="ayuda">Se vuelve a cifrar todo con la clave nueva. Antes se descarga una copia de seguridad automáticamente.
+          No cierres la app hasta que termine.</p>
+          <label>Clave actual<input type="password" name="actual" autocomplete="current-password" required></label>
+          <label>Clave nueva (mínimo 12 caracteres)<input type="password" name="n1" minlength="12" autocomplete="new-password" required></label>
+          <label>Repite la nueva<input type="password" name="n2" minlength="12" autocomplete="new-password" required></label>
+          <button class="btn primario" type="submit">Cambiar clave maestra</button>
+          <p class="ayuda" id="cambio-estado"></p><p class="error" id="err-cambio"></p>
+        </form></details>
     </section>
     <section class="tarjeta">
       <h2>📥 Importar una carpeta</h2>
@@ -1130,10 +1254,59 @@ function vistaAjustes() {
       ${eventoInstalar ? '<button class="btn primario" id="instalar">Instalar Mi Vida</button>'
         : '<p class="ayuda">En Chrome para Android: menú ⋮ → "Añadir a pantalla de inicio" o "Instalar aplicación".</p>'}
     </section>
-    <p class="ayuda centro-texto">Mi Vida · fase 1</p>`);
+    <p class="ayuda centro-texto">Mi Vida · versión 2</p>`);
   $('#bloquear').onclick = bloquear;
   $('#salir').onclick = cerrarSesion;
   $('#hoja').onclick = imprimirHoja;
+  A.pintarAvisos(ctxApp(), $('#caja-avisos'));
+
+  $('#huella-off')?.addEventListener('click', () => { S.olvidarHuella(); aviso('Huella desactivada en este dispositivo'); vistaAjustes(); });
+  $('#f-huella')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const clave = new FormData(e.target).get('c');
+    ocupado($('#f-huella button'), 'Pon el dedo…', async () => {
+      try {
+        if (!(await S.puedeUsarHuella())) throw new Error('Este dispositivo no tiene huella o reconocimiento facial disponible.');
+        await S.activarHuella(ctxApp(), clave);
+        aviso('Huella activada 👆');
+        vistaAjustes();
+      } catch (x) { $('#err-huella').textContent = x.name === 'NotAllowedError' ? 'Cancelado.' : (x.message || String(x)); }
+    });
+  });
+
+  $('#copia').onclick = (e) => ocupado(e.target, 'Preparando copia…', async () => {
+    try {
+      const r = await S.exportarCopia(ctxApp(), (t) => { $('#copia-estado').textContent = t; });
+      $('#copia-estado').textContent = `✅ Copia descargada (${r.documentos} documentos y ${r.archivos} archivos, todo cifrado).`;
+    } catch (x) { $('#copia-estado').textContent = '❌ ' + (x.message || x); }
+  });
+  $('#restaurar').onchange = async (e) => {
+    const archivo = e.target.files[0];
+    e.target.value = '';
+    if (!archivo) return;
+    const clave = prompt('Escribe la clave maestra que tenías cuando hiciste esa copia:');
+    if (!clave) return;
+    if (!confirm('Se restaurará todo lo que haya en la copia (lo que tenga el mismo identificador se sobrescribe). ¿Seguir?')) return;
+    try {
+      const n = await S.restaurarCopia(ctxApp(), archivo, clave, (t) => { $('#copia-estado').textContent = t; });
+      await cargarTodo();
+      $('#copia-estado').textContent = `✅ Restaurados ${n} elementos.`;
+    } catch (x) { $('#copia-estado').textContent = '❌ ' + (x.message || x); }
+  };
+
+  $('#f-cambio').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (f.get('n1') !== f.get('n2')) { $('#err-cambio').textContent = 'Las dos claves nuevas no coinciden.'; return; }
+    if (!confirm('¿Cambiar la clave maestra? Recuerda apuntar la nueva en tu hoja de recuperación.')) return;
+    ocupado($('#f-cambio button'), 'Cambiando…', async () => {
+      try {
+        await S.cambiarClave(ctxApp(), f.get('actual'), f.get('n1'), (t) => { $('#cambio-estado').textContent = t; });
+        aviso('Clave maestra cambiada 🔐');
+        vistaAjustes();
+      } catch (x) { $('#err-cambio').textContent = x.message || String(x); }
+    });
+  };
   $('#instalar')?.addEventListener('click', async () => { eventoInstalar.prompt(); eventoInstalar = null; });
 }
 

@@ -26,11 +26,24 @@ export function nuevaSal() {
   return aBase64(crypto.getRandomValues(new Uint8Array(16)));
 }
 
-export async function derivarClave(claveMaestra, salBase64, iteraciones = ITERACIONES) {
+// "extraible" solo se usa al activar la huella: hace falta exportar la llave para guardarla protegida por el sensor
+export async function derivarClave(claveMaestra, salBase64, iteraciones = ITERACIONES, extraible = false) {
   const base = await crypto.subtle.importKey(
     'raw', enc.encode(claveMaestra.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt: deBase64(salBase64), iterations: iteraciones, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, extraible, ['encrypt', 'decrypt']);
+}
+
+export async function importarLlaveCruda(bytes) {
+  return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+// Llave AES a partir de un secreto de 32 bytes (el que da el sensor de huella vía WebAuthn PRF)
+export async function llaveDeSecreto(secreto, contexto = 'mi-vida-huella') {
+  const base = await crypto.subtle.importKey('raw', secreto, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: enc.encode(contexto), info: new Uint8Array() },
     base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 
