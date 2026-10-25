@@ -127,7 +127,18 @@ function vistaLogin() {
       <label>Contraseña<input type="password" name="pass" autocomplete="current-password" required></label>
       <button class="btn primario" type="submit">Entrar</button>
       <p class="error" id="err"></p>
-    </form></section>`);
+    </form>
+    <button class="btn texto" id="olvido">¿Olvidaste la contraseña?</button></section>`);
+  $('#olvido').onclick = (ev) => {
+    const email = $('#f [name=email]').value.trim() || prompt('¿Cuál es tu correo?') || '';
+    if (!email) return;
+    ocupado(ev.target, 'Enviando…', async () => {
+      const volver = location.origin + location.pathname;
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: volver });
+      $('#err').textContent = error ? 'No se pudo enviar: ' + error.message
+        : `Te he enviado un correo a ${email}. Ábrelo en este dispositivo y pulsa el enlace para poner una contraseña nueva.`;
+    });
+  };
   $('#f').onsubmit = (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -1209,6 +1220,14 @@ function vistaAjustes() {
         <button class="btn" id="bloquear">🔒 Bloquear ahora</button>
         <button class="btn" id="salir">Cerrar sesión</button>
       </div>
+      <details><summary>Cambiar la contraseña de acceso</summary>
+        <form id="f-pass" class="tarjeta-plana">
+          <p class="ayuda">Es la contraseña para ENTRAR (con tu correo). No es la clave maestra: tus datos no se tocan.</p>
+          <label>Contraseña nueva (mínimo 8)<input type="password" name="p1" minlength="8" autocomplete="new-password" required></label>
+          <label>Repítela<input type="password" name="p2" minlength="8" autocomplete="new-password" required></label>
+          <button class="btn primario" type="submit">Cambiar contraseña</button>
+          <p class="error" id="err-pass"></p>
+        </form></details>
     </section>
     <section class="tarjeta">
       <h2>👆 Desbloqueo con huella</h2>
@@ -1260,6 +1279,17 @@ function vistaAjustes() {
   $('#hoja').onclick = imprimirHoja;
   A.pintarAvisos(ctxApp(), $('#caja-avisos'));
 
+  $('#f-pass').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (f.get('p1') !== f.get('p2')) { $('#err-pass').textContent = 'Las dos contraseñas no coinciden.'; return; }
+    ocupado($('#f-pass button'), 'Cambiando…', async () => {
+      const { error } = await sb.auth.updateUser({ password: f.get('p1') });
+      if (error) { $('#err-pass').textContent = 'No se pudo cambiar: ' + error.message; return; }
+      e.target.reset();
+      aviso('Contraseña de acceso cambiada ✅');
+    });
+  };
   $('#huella-off')?.addEventListener('click', () => { S.olvidarHuella(); aviso('Huella desactivada en este dispositivo'); vistaAjustes(); });
   $('#f-huella')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1464,6 +1494,32 @@ if ('serviceWorker' in navigator) {
 if (sb) {
   sb.auth.onAuthStateChange((evento) => {
     if (evento === 'SIGNED_OUT') { estado.llave = null; estado.boveda = null; }
+    if (evento === 'PASSWORD_RECOVERY') setTimeout(vistaNuevaPassword, 0);
   });
+}
+
+// Llega aquí desde el enlace del correo de recuperación
+function vistaNuevaPassword() {
+  history.replaceState(null, '', location.pathname);
+  $('#menu').hidden = true;
+  pintar(`<section class="centro"><div class="logo">🔑</div><h1>Nueva contraseña de acceso</h1>
+    <form id="f" class="tarjeta">
+      <p class="ayuda">Es la contraseña para entrar. Tu clave maestra y tus datos no cambian.</p>
+      <label>Contraseña nueva (mínimo 8)<input type="password" name="p1" minlength="8" autocomplete="new-password" required></label>
+      <label>Repítela<input type="password" name="p2" minlength="8" autocomplete="new-password" required></label>
+      <button class="btn primario" type="submit">Guardar</button>
+      <p class="error" id="err"></p>
+    </form></section>`);
+  $('#f').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (f.get('p1') !== f.get('p2')) { $('#err').textContent = 'Las dos contraseñas no coinciden.'; return; }
+    ocupado($('#f button'), 'Guardando…', async () => {
+      const { error } = await sb.auth.updateUser({ password: f.get('p1') });
+      if (error) { $('#err').textContent = 'No se pudo cambiar: ' + error.message; return; }
+      aviso('Contraseña cambiada ✅');
+      arrancar();
+    });
+  };
 }
 arrancar().catch(vistaError);
