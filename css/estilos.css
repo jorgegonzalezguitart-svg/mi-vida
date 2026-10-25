@@ -399,3 +399,6 @@ summary { cursor: pointer; font-size: .9rem; }
 .en-linea-form { display: flex; gap: 8px; align-items: center; }
 .en-linea-form input { margin: 0; flex: 1; }
 .tarjeta-plana { padding: 8px 0 0; }
+
+/* Campo de clave maestra: se oculta con puntos sin ser un campo "password" (así el móvil no lo autorrellena) */
+.oculto-texto { -webkit-text-security: disc; text-security: disc; }

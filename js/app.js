@@ -192,9 +192,13 @@ function vistaCrearClave() {
 function vistaDesbloquear() {
   pintar(`<section class="centro">
     <div class="logo">🔒</div><h1>Mi Vida está bloqueada</h1>
-    <form id="f" class="tarjeta">
-      <label>Clave maestra<input type="password" name="c" autocomplete="current-password" required autofocus></label>
+    <form id="f" class="tarjeta" autocomplete="off">
+      <label>Clave maestra
+        <span class="con-boton"><input type="text" name="clave-maestra" id="clave-m" class="oculto-texto" required autofocus
+          autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
+        <button type="button" class="btn peq" id="ver-clave" aria-label="Mostrar u ocultar">👁️</button></span></label>
       <button class="btn primario" type="submit">Desbloquear</button>
+      <p class="ayuda" id="esperando"></p>
       <p class="error" id="err"></p>
     </form>
     ${S.huellaActiva(estado.usuario?.id) ? '<button class="btn huella" id="huella">👆 Desbloquear con huella</button>' : ''}
@@ -208,17 +212,29 @@ function vistaDesbloquear() {
     });
     botonHuella.onclick = usarHuella;
   }
+  $('#ver-clave').onclick = () => $('#clave-m').classList.toggle('oculto-texto');
   $('#f').onsubmit = (e) => {
     e.preventDefault();
-    const clave = new FormData(e.target).get('c');
-    ocupado($('#f button'), 'Comprobando…', async () => {
+    const clave = $('#clave-m').value;
+    $('#err').textContent = '';
+    $('#esperando').textContent = 'Comprobando la clave… en el móvil puede tardar unos segundos.';
+    ocupado($('#f button[type=submit]'), 'Comprobando…', async () => {
       const b = estado.boveda;
-      let llave;
-      try {
-        llave = await C.derivarClave(clave, b.sal, b.iteraciones);
-        await C.descifrarJSON(llave, b.comprobacion);
-      } catch {
-        $('#err').textContent = 'Clave maestra incorrecta.';
+      // Prueba la clave tal cual y, si falla, sin espacios al principio/final (el teclado del móvil a veces los añade)
+      const variantes = [...new Set([clave, clave.trim()])];
+      let llave = null;
+      for (const v of variantes) {
+        try {
+          const l = await C.derivarClave(v, b.sal, b.iteraciones);
+          await C.descifrarJSON(l, b.comprobacion);
+          llave = l;
+          break;
+        } catch { /* probar la siguiente */ }
+      }
+      $('#esperando').textContent = '';
+      if (!llave) {
+        $('#err').innerHTML = 'Clave maestra incorrecta.<br><small>Pulsa 👁️ para ver lo que has escrito: revisa mayúsculas, espacios, '
+          + 'y que el móvil no haya rellenado solo otra contraseña.</small>';
         return;
       }
       await abrirBoveda(llave);
