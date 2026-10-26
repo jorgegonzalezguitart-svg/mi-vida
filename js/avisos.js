@@ -42,8 +42,10 @@ export function calcularAvisos(estado) {
   const ahora = Date.now();
   const limite = ahora + 400 * 86400000;
   const lista = [];
+  // Los documentos enlazados a un contrato avisan desde Contratos (renovación), no aquí (así no se duplican)
+  const enContratos = new Set(contratosDe(estado).filter((c) => c.docId && c.estadoContrato !== 'baja').map((c) => c.docId));
   for (const d of estado.docs || []) {
-    if (!d.caduca) continue;
+    if (!d.caduca || enContratos.has(d.id)) continue;
     const dia = fechaLocal(d.caduca);
     for (const n of DIAS_CADUCIDAD) {
       const cuando = new Date(dia.getTime() - n * 86400000);

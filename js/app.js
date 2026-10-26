@@ -309,7 +309,7 @@ async function borrarRegistro(id) {
 function ctxApp() {
   return {
     estado, sb, C, TABLAS, BUCKET, esc, fecha, num, euros, pintar, $, $$, ir, aviso, ocupado,
-    guardarRegistro, borrarRegistro, copiar, descargarArchivo,
+    guardarRegistro, borrarRegistro, copiar, descargarArchivo, borrarDocumento,
     pintarAvisos: (caja) => A.pintarAvisos(ctxApp(), caja),
   };
 }
@@ -440,7 +440,7 @@ function vistaInicio() {
     </section>
 
     <section class="resumen">
-      <a href="#documentos" class="dato"><b>${estado.docs.length}</b><span>Documentos</span></a>
+      <a href="#documentos" class="dato"><b>${docsVisibles().length}</b><span>Documentos</span></a>
       <a href="#contrasenas" class="dato"><b>${estado.claves.length}</b><span>Contraseñas</span></a>
     </section>
 
@@ -496,8 +496,23 @@ function filaDoc(d) {
   </a></li>`;
 }
 
+// Los PDF enlazados a un contrato solo se ven en Contratos (no se duplican en Docs)
+const idsEnContratos = () => new Set((estado.registros || []).filter((r) => r.tipo === 'contrato' && r.docId).map((r) => r.docId));
+const docsVisibles = () => { const ids = idsEnContratos(); return estado.docs.filter((d) => !ids.has(d.id)); };
+
+// Borra un documento y sus archivos cifrados (lo usan la ficha del documento y Contratos)
+async function borrarDocumento(d) {
+  const rutas = (d.archivos || []).map((a) => a.ruta);
+  if (rutas.length) await sb.storage.from(BUCKET).remove(rutas);
+  const { error } = await sb.from(T_DOCS).delete().eq('id', d.id);
+  if (error) throw error;
+  estado.docs = estado.docs.filter((x) => x.id !== d.id);
+  A.sincronizar(ctxApp());
+}
+
 function vistaDocumentos(q) {
   const filtro = q.get('cat') || '';
+  const ocultos = estado.docs.length - docsVisibles().length;
   pintar(`<header class="cabecera fila"><h1>Documentos</h1>
       <a class="btn primario peq" href="#nuevo-doc${filtro ? '?cat=' + filtro : ''}">＋ Añadir</a></header>
     <input type="search" id="buscar" class="buscar" placeholder="Buscar…" aria-label="Buscar documentos">
@@ -505,10 +520,11 @@ function vistaDocumentos(q) {
       <a class="chip ${filtro ? '' : 'activo'}" href="#documentos">Todos</a>
       ${CATEGORIAS.map((c) => `<a class="chip ${c.id === filtro ? 'activo' : ''}" href="#documentos?cat=${c.id}">${c.icono} ${esc(c.nombre)}</a>`).join('')}
     </div>
-    <ul id="lista" class="lista"></ul>`);
+    <ul id="lista" class="lista"></ul>
+    ${ocultos ? `<p class="ayuda">📑 ${ocultos} contrato${ocultos > 1 ? 's' : ''} (luz, gas, seguros, hipoteca…) está${ocultos > 1 ? 'n' : ''} en <a href="#contratos">Contratos</a>.</p>` : ''}`);
   const pintarLista = () => {
     const t = $('#buscar').value.trim().toLowerCase();
-    const items = estado.docs
+    const items = docsVisibles()
       .filter((d) => !filtro || d.categoria === filtro)
       .filter((d) => !t || `${d.titulo} ${d.numero || ''} ${d.notas || ''}`.toLowerCase().includes(t))
       .sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
@@ -554,11 +570,7 @@ function vistaDoc(id) {
   $('#borrar').onclick = (ev) => {
     if (!confirm(`¿Borrar "${d.titulo}" y sus archivos? No se puede deshacer.`)) return;
     ocupado(ev.target, 'Borrando…', async () => {
-      const rutas = (d.archivos || []).map((a) => a.ruta);
-      if (rutas.length) await sb.storage.from(BUCKET).remove(rutas);
-      const { error } = await sb.from(T_DOCS).delete().eq('id', d.id);
-      if (error) { aviso('No se pudo borrar: ' + error.message, 'error'); return; }
-      estado.docs = estado.docs.filter((x) => x.id !== d.id);
+      try { await borrarDocumento(d); } catch (error) { aviso('No se pudo borrar: ' + (error.message || error), 'error'); return; }
       aviso('Documento borrado');
       ir('#documentos');
     });

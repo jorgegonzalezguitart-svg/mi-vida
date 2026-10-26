@@ -200,14 +200,21 @@ export function vistaFormContrato(ctx, id, q) {
         ${contactos.map((x) => `<option value="${x.id}" ${x.id === v.contactoId ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>
       <label>Notas<textarea name="notas" rows="2">${esc(v.notas)}</textarea></label>
       <button class="btn primario" type="submit">Guardar</button>
-      ${c ? '<button class="btn peligro ancho" type="button" id="borrar">🗑️ Borrar</button>' : ''}
+      ${c ? `<button class="btn peligro ancho" type="button" id="borrar">🗑️ Borrar contrato${c.docId ? ' y su PDF' : ''}</button>
+        <p class="ayuda">Cuando cambies de compañía: da de alta el contrato nuevo y borra aquí el antiguo (con su PDF).</p>` : ''}
       <p class="error" id="err"></p>
     </form>`);
-  $('#borrar')?.addEventListener('click', async () => {
-    if (!confirm(`¿Borrar el contrato "${c.nombre}"? (El PDF sigue en Docs)`)) return;
-    await ctx.borrarRegistro(c.id);
-    ctx.aviso('Contrato borrado');
-    ctx.ir(`#contratos?s=${c.servicio}`);
+  $('#borrar')?.addEventListener('click', (ev) => {
+    const doc = c.docId ? estado.docs.find((d) => d.id === c.docId) : null;
+    if (!confirm(`¿Borrar el contrato "${c.nombre}"${doc ? ` y su PDF ("${doc.titulo}")` : ''}? No se puede deshacer.`)) return;
+    ctx.ocupado(ev.target, 'Borrando…', async () => {
+      try {
+        if (doc) await ctx.borrarDocumento(doc);
+        await ctx.borrarRegistro(c.id);
+        ctx.aviso(doc ? 'Contrato y PDF borrados' : 'Contrato borrado');
+        ctx.ir(`#contratos?s=${c.servicio}`);
+      } catch (error) { $('#err').textContent = 'No se pudo borrar: ' + (error.message || error); }
+    });
   });
   $('#f').onsubmit = (e) => {
     e.preventDefault();
