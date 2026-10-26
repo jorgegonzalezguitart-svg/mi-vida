@@ -335,7 +335,7 @@ summary { cursor: pointer; font-size: .9rem; }
 /* Menú inferior */
 #menu {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   background: var(--tarjeta); border-top: 1px solid var(--borde);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
 }
@@ -427,3 +427,17 @@ summary { cursor: pointer; font-size: .9rem; }
 .dato-fila .texto .nota { font-size: .75rem; }
 .dato-fila .copiar { margin: 0; flex: none; }
 .dato-fila[hidden], .grupo-datos[hidden] { display: none; }
+
+/* Contratos */
+.contrato .fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.contrato h2 { margin: 0; }
+.contrato .sub { margin: 2px 0 10px; color: var(--suave); }
+.contrato .mini li b { text-align: right; font-weight: 600; }
+.contrato .mini li b small { color: var(--suave); font-weight: 400; }
+.contrato .condiciones { background: var(--fondo); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.contrato .condiciones h3 { margin: 0 0 4px; font-size: .9rem; color: var(--suave); }
+.contrato .condiciones p { margin: 0; font-size: .92rem; line-height: 1.45; }
+.contrato.de-baja { opacity: .6; }
+.etiqueta.cambio { background: #fff3cd; color: #7a5b00; }
+.etiqueta.baja { background: var(--borde); color: var(--suave); }
+.mini li.total { border-top: 1px solid var(--borde); margin-top: 4px; padding-top: 8px; font-weight: 700; }

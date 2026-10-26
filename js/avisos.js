@@ -4,6 +4,7 @@
 // - Una función programada (mivida-avisos) envía un push genérico a esa hora y el móvil muestra el texto local.
 import { VAPID_PUBLICA } from './vapid.js';
 import { ocurrencias } from './calendario.js';
+import { contratosDe, fechasContrato } from './contratos.js';
 
 const T_AVISOS = 'mivida_avisos';
 const T_PUSH = 'mivida_push';
@@ -63,6 +64,19 @@ export function calcularAvisos(estado) {
         const dias = Math.round((fechaLocal(f, '00:00') - fechaLocal(iso(cuando), '00:00')) / 86400000);
         const cuanto = dias <= 0 ? 'Hoy' : dias === 1 ? 'Mañana' : `En ${dias} días`;
         lista.push({ cuando, titulo: `📌 ${ev.titulo}`, cuerpo: `${cuanto}: ${corta(momento)}${ev.hora ? ' a las ' + ev.hora : ''}`, url: `#calendario?m=${f.slice(0, 7)}&d=${f}` });
+      }
+    }
+  }
+  // Contratos: renovación (30 y 7 días antes y el día), fin de permanencia (30 días antes y el día) y revisión (el día)
+  for (const c of contratosDe(estado)) {
+    for (const x of fechasContrato(c)) {
+      const dia = fechaLocal(x.f, x.que === 'Revisar tarifa' ? '10:00' : '09:00');
+      const antes = x.que === 'Revisar tarifa' ? [0] : x.que === 'Fin de la permanencia' ? [30, 0] : [30, 7, 0];
+      for (const n of antes) {
+        const cuando = new Date(dia.getTime() - n * 86400000);
+        if (cuando.getTime() < ahora || cuando.getTime() > limite) continue;
+        const txt = x.que === 'Revisar tarifa' ? 'Toca buscar una tarifa mejor.' : `${x.que} ${n ? `en ${n} días` : 'hoy'} (${corta(dia)}).`;
+        lista.push({ cuando, titulo: `📑 ${c.nombre}`, cuerpo: x.que === 'Revisar tarifa' ? txt : `${txt}${x.que === 'Se renueva solo' ? ' Compara precios antes.' : ''}`, url: `#contratos?s=${c.servicio}` });
       }
     }
   }

@@ -10,6 +10,7 @@ import * as A from './avisos.js';
 import * as H from './hipoteca.js';
 import * as CO from './contactos.js';
 import * as DI from './datos-importantes.js';
+import * as CT from './contratos.js';
 
 // ============================================================
 //  Estado y utilidades
@@ -308,7 +309,7 @@ async function borrarRegistro(id) {
 function ctxApp() {
   return {
     estado, sb, C, TABLAS, BUCKET, esc, fecha, num, euros, pintar, $, $$, ir, aviso, ocupado,
-    guardarRegistro, borrarRegistro, copiar,
+    guardarRegistro, borrarRegistro, copiar, descargarArchivo,
     pintarAvisos: (caja) => A.pintarAvisos(ctxApp(), caja),
   };
 }
@@ -370,7 +371,7 @@ function router() {
     importar: 'mas', ajustes: 'mas', lista: 'mas', contrasenas: 'mas',
     clave: 'mas', 'nueva-clave': 'mas', 'editar-clave': 'mas',
     dinero: 'mas', 'nuevo-mov': 'mas', 'editar-mov': 'mas', 'nuevo-evento': 'calendario', 'editar-evento': 'calendario',
-    datos: 'mas', 'nuevo-dato': 'mas', 'editar-dato': 'mas', contactos: 'mas', 'nuevo-contacto': 'mas', 'editar-contacto': 'mas', 'editar-hipoteca': 'inversiones',
+    'nuevo-contrato': 'contratos', 'editar-contrato': 'contratos', datos: 'mas', 'nuevo-dato': 'mas', 'editar-dato': 'mas', contactos: 'mas', 'nuevo-contacto': 'mas', 'editar-contacto': 'mas', 'editar-hipoteca': 'inversiones',
     inversion: 'inversiones', 'nueva-inversion': 'inversiones', 'editar-inversion': 'inversiones' }[nombre] || nombre;
   $$('a', menu).forEach((a) => a.classList.toggle('activo', a.dataset.ruta === seccion));
 
@@ -402,6 +403,9 @@ function router() {
     case 'editar-contacto': return CO.vistaFormContacto(ctxApp(), param);
     case 'editar-hipoteca': return H.vistaFormHipoteca(ctxApp());
     case 'datos': return DI.vistaDatos(ctxApp(), q);
+    case 'contratos': return CT.vistaContratos(ctxApp(), q);
+    case 'nuevo-contrato': return CT.vistaFormContrato(ctxApp(), null, q);
+    case 'editar-contrato': return CT.vistaFormContrato(ctxApp(), param, q);
     case 'nuevo-dato': return DI.vistaFormDato(ctxApp(), null);
     case 'editar-dato': return DI.vistaFormDato(ctxApp(), param);
     default: return vistaInicio();
